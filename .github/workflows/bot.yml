@@ -20,6 +20,7 @@ jobs:
         with:
           name: published-ids
           path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
       - name: Setup Python
