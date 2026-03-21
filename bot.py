@@ -28,13 +28,39 @@ DELAY_BETWEEN_POSTS = 4      # секунды между постами (на с
 # ══════════════════════════════════════════
 
 RSS_FEEDS = [
-    ("BBC World",       "https://feeds.bbci.co.uk/news/rss.xml"),
-    ("Reuters",         "https://feeds.reuters.com/reuters/topNews"),
-    ("Hacker News",     "https://hnrss.org/frontpage"),
-    ("TechCrunch",      "https://techcrunch.com/feed/"),
-    ("The Verge",       "https://www.theverge.com/rss/index.xml"),
-    ("Reddit World",    "https://www.reddit.com/r/worldnews/.rss"),
-    ("Today I Learned", "https://www.reddit.com/r/todayilearned/.rss"),
+    # 🌍 Мировые новости
+    ("BBC World",           "https://feeds.bbci.co.uk/news/rss.xml"),
+    ("Reuters",             "https://feeds.reuters.com/reuters/topNews"),
+    ("Al Jazeera",          "https://www.aljazeera.com/xml/rss/all.xml"),
+    ("Associated Press",    "https://feeds.feedburner.com/APNewsAlerts"),
+
+    # 💻 Технологии и ИИ
+    ("TechCrunch",          "https://techcrunch.com/feed/"),
+    ("The Verge",           "https://www.theverge.com/rss/index.xml"),
+    ("Hacker News",         "https://hnrss.org/frontpage"),
+    ("Wired",               "https://www.wired.com/feed/rss"),
+    ("Ars Technica",        "https://feeds.arstechnica.com/arstechnica/index"),
+    ("MIT Tech Review",     "https://www.technologyreview.com/feed/"),
+
+    # 💰 Бизнес и деньги
+    ("Bloomberg Markets",   "https://feeds.bloomberg.com/markets/news.rss"),
+    ("Fortune",             "https://fortune.com/feed/"),
+    ("Business Insider",    "https://feeds.businessinsider.com/custom/all"),
+
+    # 🔬 Наука
+    ("Science Daily",       "https://www.sciencedaily.com/rss/all.xml"),
+    ("NASA",                "https://www.nasa.gov/rss/dyn/breaking_news.rss"),
+    ("New Scientist",       "https://www.newscientist.com/feed/home/"),
+
+    # 😄 Курьёзы и интересное
+    ("Reddit World News",   "https://www.reddit.com/r/worldnews/.rss"),
+    ("Today I Learned",     "https://www.reddit.com/r/todayilearned/.rss"),
+    ("Reddit Interesting",  "https://www.reddit.com/r/InterestingAsHell/.rss"),
+    ("Reddit Futurology",   "https://www.reddit.com/r/Futurology/.rss"),
+
+    # 🎮 Игры и развлечения
+    ("IGN",                 "https://feeds.ign.com/ign/all"),
+    ("Kotaku",              "https://kotaku.com/rss"),
 ]
 
 # ══════════════════════════════════════════
