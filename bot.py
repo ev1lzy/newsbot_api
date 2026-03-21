@@ -14,20 +14,19 @@ from datetime import datetime, timezone, timedelta
 #  КОНФИГУРАЦИЯ
 # ══════════════════════════════════════════
 
-BOT_TOKEN  = os.environ["BOT_TOKEN"]
-CHAT_ID    = os.environ["CHAT_ID"]
-GROQ_KEY   = os.environ["GROQ_KEY"]
+BOT_TOKEN     = os.environ["BOT_TOKEN"]
+CHAT_ID       = os.environ["CHAT_ID"]
+GROQ_KEY      = os.environ["GROQ_KEY"]
+UNSPLASH_KEY  = os.environ.get("UNSPLASH_KEY", "")  # опционально
 
 PUBLISHED_FILE      = "published.json"
-MAX_POSTS_PER_RUN   = 1      # 1 новость за запуск
-FRESHNESS_HOURS     = 2      # не брать новости старше 2 часов
-DELAY_BETWEEN_POSTS = 4      # секунды между постами
+MAX_POSTS_PER_RUN   = 1
+FRESHNESS_HOURS     = 2
+DELAY_BETWEEN_POSTS = 4
 
-# Тихие часы по Киеву (UTC+2 / UTC+3 летом)
-QUIET_HOUR_START = 23   # с 23:00
-QUIET_HOUR_END   = 7    # до 07:00
+QUIET_HOUR_START = 23
+QUIET_HOUR_END   = 7
 
-# Доступные эмодзи для реакций
 ALLOWED_EMOJIS = "❤️ 👍 👎 🔥 😁 😍 😱 🤬 😢 🎉 💩 🕊 🤡 ❤‍🔥 🏆 😭 💘"
 
 # ══════════════════════════════════════════
@@ -82,7 +81,7 @@ SYSTEM_PROMPT = """Ты — редактор Telegram-канала «Слышь,
 
 Если проходит — напиши пост в стиле умного друга:
 - 2-4 предложения
-- Начни с 1-2 эмодзи
+- Начни ТОЛЬКО с 1 эмодзи, соответствующего теме
 - Разговорный тон, без воды
 - Пиши на русском языке"""
 
@@ -92,35 +91,35 @@ USER_PROMPT_TEMPLATE = """Перепиши новость в стиле кана
 Краткое содержание: {summary}
 Источник: {source}
 
-Ответь строго в формате (три строки):
+Ответь строго в формате (четыре строки):
 ТЕКСТ: [текст поста 2-4 предложения с эмодзи]
+ФОТО: [1-2 слова на английском для поиска фото, отражающих суть новости]
 РЕАКЦИЯ1: [эмодзи] — [короткий текст реакции от лица читателя]
 РЕАКЦИЯ2: [эмодзи] — [короткий текст реакции от лица читателя]
 
-Для реакций используй ТОЛЬКО эти эмодзи (выбирай подходящие по смыслу):
+Для реакций используй ТОЛЬКО эти эмодзи:
 {allowed_emojis}
 
 Примеры:
-РЕАКЦИЯ1: ❤️ — хоть бы не фейк
-РЕАКЦИЯ2: 👎 — не верю, забанят полностью
+ТЕКСТ: 🔥 Что-то произошло...
+ФОТО: space rocket
+РЕАКЦИЯ1: 😱 — не может быть
+РЕАКЦИЯ2: 🔥 — это топ
 
 Если новость не интересна — ответь: SKIP"""
 
 # ══════════════════════════════════════════
-#  ПРОВЕРКА ТИХИХ ЧАСОВ
+#  ТИХИЕ ЧАСЫ
 # ══════════════════════════════════════════
 
 def is_quiet_hours() -> bool:
-    """Проверяет тихие часы по Киеву (UTC+2)."""
     kyiv_offset = timedelta(hours=2)
     kyiv_time = datetime.now(timezone.utc) + kyiv_offset
     hour = kyiv_time.hour
-    if QUIET_HOUR_START <= 23 and QUIET_HOUR_END <= 7:
-        return hour >= QUIET_HOUR_START or hour < QUIET_HOUR_END
-    return False
+    return hour >= QUIET_HOUR_START or hour < QUIET_HOUR_END
 
 # ══════════════════════════════════════════
-#  РАБОТА С БАЗОЙ ОПУБЛИКОВАННЫХ
+#  БАЗА ОПУБЛИКОВАННЫХ
 # ══════════════════════════════════════════
 
 def load_published() -> set:
@@ -134,9 +133,8 @@ def load_published() -> set:
 
 
 def save_published(ids: set):
-    ids_list = list(ids)[-1000:]
     with open(PUBLISHED_FILE, "w") as f:
-        json.dump(ids_list, f)
+        json.dump(list(ids)[-1000:], f)
 
 
 def make_url_hash(url: str) -> str:
@@ -148,10 +146,11 @@ def make_title_hash(title: str) -> str:
     return "t_" + hashlib.md5(normalized.encode()).hexdigest()
 
 # ══════════════════════════════════════════
-#  ПОЛУЧЕНИЕ КАРТИНКИ ИЗ RSS
+#  ФОТО: RSS или Unsplash
 # ══════════════════════════════════════════
 
 def get_image_from_entry(entry) -> str:
+    """Берёт фото из RSS если есть."""
     media = entry.get("media_content", [])
     if media and media[0].get("url"):
         return media[0]["url"]
@@ -161,6 +160,29 @@ def get_image_from_entry(entry) -> str:
     thumbnail = entry.get("media_thumbnail", [])
     if thumbnail and thumbnail[0].get("url"):
         return thumbnail[0]["url"]
+    return None
+
+
+def get_unsplash_photo(query: str) -> str:
+    """Ищет красивое фото на Unsplash по запросу."""
+    if not UNSPLASH_KEY or not query:
+        return None
+    try:
+        response = requests.get(
+            "https://api.unsplash.com/photos/random",
+            params={
+                "query": query,
+                "orientation": "landscape",
+                "content_filter": "high"
+            },
+            headers={"Authorization": f"Client-ID {UNSPLASH_KEY}"},
+            timeout=10
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return data["urls"]["regular"]
+    except Exception as e:
+        print(f"⚠️  Unsplash ошибка: {e}")
     return None
 
 # ══════════════════════════════════════════
@@ -183,9 +205,7 @@ def fetch_fresh_news(published_ids: set) -> list:
                 title      = entry.get("title", "").strip()
                 title_hash = make_title_hash(title)
 
-                if url_hash in published_ids:
-                    continue
-                if title_hash in published_ids:
+                if url_hash in published_ids or title_hash in published_ids:
                     continue
 
                 published_parsed = entry.get("published_parsed")
@@ -194,8 +214,10 @@ def fetch_fresh_news(published_ids: set) -> list:
                     if pub_dt < cutoff:
                         continue
 
-                summary = entry.get("summary", entry.get("description", "")).strip()
-                summary = re.sub(r'<[^>]+>', '', summary)[:600]
+                summary = re.sub(
+                    r'<[^>]+>', '',
+                    entry.get("summary", entry.get("description", "")).strip()
+                )[:600]
 
                 if not title:
                     continue
@@ -207,7 +229,7 @@ def fetch_fresh_news(published_ids: set) -> list:
                     "summary":    summary,
                     "link":       url,
                     "source":     source_name,
-                    "image_url":  get_image_from_entry(entry),
+                    "rss_image":  get_image_from_entry(entry),
                 })
 
         except Exception as e:
@@ -242,7 +264,7 @@ def rewrite_with_ai(title: str, summary: str, source: str):
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user",   "content": prompt}
                 ],
-                "max_tokens": 300,
+                "max_tokens": 350,
                 "temperature": 0.7
             },
             timeout=30
@@ -250,22 +272,25 @@ def rewrite_with_ai(title: str, summary: str, source: str):
 
         if response.status_code != 200:
             print(f"⚠️  Groq ошибка {response.status_code}: {response.text[:200]}")
-            return None, None
+            return None, None, None
 
         text = response.json()["choices"][0]["message"]["content"].strip()
 
         if text.upper().startswith("SKIP"):
             print("   ⏭️  ИИ пропустил (не интересно)")
-            return None, None
+            return None, None, None
 
-        post_text  = ""
-        reakciya1  = ""
-        reakciya2  = ""
+        post_text = ""
+        photo_query = ""
+        reakciya1 = ""
+        reakciya2 = ""
 
         for line in text.split("\n"):
             line = line.strip()
             if line.startswith("ТЕКСТ:"):
                 post_text = line.replace("ТЕКСТ:", "").strip()
+            elif line.startswith("ФОТО:"):
+                photo_query = line.replace("ФОТО:", "").strip()
             elif line.startswith("РЕАКЦИЯ1:"):
                 reakciya1 = line.replace("РЕАКЦИЯ1:", "").strip()
             elif line.startswith("РЕАКЦИЯ2:"):
@@ -274,18 +299,17 @@ def rewrite_with_ai(title: str, summary: str, source: str):
         if not post_text:
             post_text = text
 
-        # Форматируем реакции с отступом
         reactions = ""
         if reakciya1 or reakciya2:
             reactions = "\n\n" + reakciya1
             if reakciya2:
                 reactions += "\n" + reakciya2
 
-        return post_text, reactions
+        return post_text, reactions, photo_query
 
     except Exception as e:
         print(f"⚠️  Ошибка ИИ: {e}")
-        return None, None
+        return None, None, None
 
 # ══════════════════════════════════════════
 #  ПУБЛИКАЦИЯ В TELEGRAM
@@ -339,7 +363,6 @@ def send_to_telegram(text: str, image_url: str = None, reactions: str = "") -> b
 def main():
     print(f"🚀 Запуск бота | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Проверка тихих часов
     if is_quiet_hours():
         print("🌙 Тихие часы (23:00–07:00 по Киеву). Пропускаем.")
         return
@@ -362,14 +385,26 @@ def main():
 
         print(f"\n🔄 Обрабатываю: {item['title'][:60]}...")
 
-        post_text, reactions = rewrite_with_ai(item["title"], item["summary"], item["source"])
+        post_text, reactions, photo_query = rewrite_with_ai(
+            item["title"], item["summary"], item["source"]
+        )
 
         if not post_text:
             published.add(item["url_hash"])
             published.add(item["title_hash"])
             continue
 
-        success = send_to_telegram(post_text, item.get("image_url"), reactions or "")
+        # Выбираем фото: сначала RSS, потом Unsplash
+        image_url = item.get("rss_image")
+        if not image_url and photo_query and UNSPLASH_KEY:
+            print(f"   🖼️  Ищу фото на Unsplash: {photo_query}")
+            image_url = get_unsplash_photo(photo_query)
+            if image_url:
+                print(f"   ✅ Фото найдено")
+            else:
+                print(f"   ⚠️  Фото не найдено, публикую без фото")
+
+        success = send_to_telegram(post_text, image_url, reactions or "")
 
         if success:
             published.add(item["url_hash"])
