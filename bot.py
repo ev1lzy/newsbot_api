@@ -35,9 +35,11 @@ ALLOWED_EMOJIS = "❤️ 👍 👎 🔥 😁 😍 😱 🤬 😢 🎉 💩 🕊 
 
 RSS_FEEDS = [
     # Мировые новости
+    ("Habr Top", "https://habr.com/ru/rss/hubs/popular/"),
     ("BBC World",           "https://feeds.bbci.co.uk/news/rss.xml"),
     ("Reuters",             "https://feeds.reuters.com/reuters/topNews"),
     ("Al Jazeera",          "https://www.aljazeera.com/xml/rss/all.xml"),
+    ("Google News World",  "https://news.google.com/rss?hl=ru&gl=RU&ceid=RU:ru"),
     # Технологии и ИИ
     ("TechCrunch",          "https://techcrunch.com/feed/"),
     ("The Verge",           "https://www.theverge.com/rss/index.xml"),
@@ -53,7 +55,6 @@ RSS_FEEDS = [
     ("NASA",                "https://www.nasa.gov/rss/dyn/breaking_news.rss"),
     # Курьёзы
     ("Reddit World News",   "https://www.reddit.com/r/worldnews/.rss"),
-    ("Today I Learned",     "https://www.reddit.com/r/todayilearned/.rss"),
     ("Reddit Futurology",   "https://www.reddit.com/r/Futurology/.rss"),
 ]
 
