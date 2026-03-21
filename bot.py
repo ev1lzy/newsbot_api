@@ -395,14 +395,16 @@ def main():
             continue
 
         # Выбираем фото: сначала RSS, потом Unsplash
-        image_url = item.get("rss_image")
-        if not image_url and photo_query and UNSPLASH_KEY:
+        # Всегда используем Unsplash если есть ключ
+        image_url = None
+        if photo_query and UNSPLASH_KEY:
             print(f"   🖼️  Ищу фото на Unsplash: {photo_query}")
             image_url = get_unsplash_photo(photo_query)
-            if image_url:
-                print(f"   ✅ Фото найдено")
-            else:
-                print(f"   ⚠️  Фото не найдено, публикую без фото")
+        if image_url:
+            print(f"   ✅ Фото найдено")
+        # Если Unsplash не дал — берём из RSS
+        if not image_url:
+            image_url = item.get("rss_image")
 
         success = send_to_telegram(post_text, image_url, reactions or "")
 
