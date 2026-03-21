@@ -23,6 +23,13 @@ MAX_POSTS_PER_RUN   = 1      # 1 новость за запуск
 FRESHNESS_HOURS     = 2      # не брать новости старше 2 часов
 DELAY_BETWEEN_POSTS = 4      # секунды между постами
 
+# Тихие часы по Киеву (UTC+2 / UTC+3 летом)
+QUIET_HOUR_START = 23   # с 23:00
+QUIET_HOUR_END   = 7    # до 07:00
+
+# Доступные эмодзи для реакций
+ALLOWED_EMOJIS = "❤️ 👍 👎 🔥 😁 😍 😱 🤬 😢 🎉 💩 🕊 🤡 ❤‍🔥 🏆 😭 💘"
+
 # ══════════════════════════════════════════
 #  RSS ИСТОЧНИКИ
 # ══════════════════════════════════════════
@@ -85,19 +92,32 @@ USER_PROMPT_TEMPLATE = """Перепиши новость в стиле кана
 Краткое содержание: {summary}
 Источник: {source}
 
-Ответь строго в формате:
+Ответь строго в формате (три строки):
 ТЕКСТ: [текст поста 2-4 предложения с эмодзи]
-РЕАКЦИИ:
-[эмодзи] — [короткий текст реакции]
-[эмодзи] — [короткий текст реакции]
+РЕАКЦИЯ1: [эмодзи] — [короткий текст реакции от лица читателя]
+РЕАКЦИЯ2: [эмодзи] — [короткий текст реакции от лица читателя]
 
-Пример как должны выглядеть реакции:
-❤️ — очень жаль, он крутой
-👎 — так ему и надо
+Для реакций используй ТОЛЬКО эти эмодзи (выбирай подходящие по смыслу):
+{allowed_emojis}
 
-Эмодзи выбирай сам под тему новости. Текст реакций — короткий, живой, от лица читателя.
+Примеры:
+РЕАКЦИЯ1: ❤️ — хоть бы не фейк
+РЕАКЦИЯ2: 👎 — не верю, забанят полностью
 
 Если новость не интересна — ответь: SKIP"""
+
+# ══════════════════════════════════════════
+#  ПРОВЕРКА ТИХИХ ЧАСОВ
+# ══════════════════════════════════════════
+
+def is_quiet_hours() -> bool:
+    """Проверяет тихие часы по Киеву (UTC+2)."""
+    kyiv_offset = timedelta(hours=2)
+    kyiv_time = datetime.now(timezone.utc) + kyiv_offset
+    hour = kyiv_time.hour
+    if QUIET_HOUR_START <= 23 and QUIET_HOUR_END <= 7:
+        return hour >= QUIET_HOUR_START or hour < QUIET_HOUR_END
+    return False
 
 # ══════════════════════════════════════════
 #  РАБОТА С БАЗОЙ ОПУБЛИКОВАННЫХ
@@ -206,7 +226,8 @@ def rewrite_with_ai(title: str, summary: str, source: str):
     prompt = USER_PROMPT_TEMPLATE.format(
         title=title,
         summary=summary if summary else "Нет описания",
-        source=source
+        source=source,
+        allowed_emojis=ALLOWED_EMOJIS
     )
     try:
         response = requests.post(
@@ -237,22 +258,28 @@ def rewrite_with_ai(title: str, summary: str, source: str):
             print("   ⏭️  ИИ пропустил (не интересно)")
             return None, None
 
-        post_text = ""
-        reactions = ""
-        reactions_start = False
+        post_text  = ""
+        reakciya1  = ""
+        reakciya2  = ""
 
-        if "ТЕКСТ:" in text:
-            for line in text.split("\n"):
-                line = line.strip()
-                if line.startswith("ТЕКСТ:"):
-                    post_text = line.replace("ТЕКСТ:", "").strip()
-                elif line.startswith("РЕАКЦИИ:"):
-                    reactions_start = True
-                elif reactions_start and line:
-                    reactions += "\n" + line
+        for line in text.split("\n"):
+            line = line.strip()
+            if line.startswith("ТЕКСТ:"):
+                post_text = line.replace("ТЕКСТ:", "").strip()
+            elif line.startswith("РЕАКЦИЯ1:"):
+                reakciya1 = line.replace("РЕАКЦИЯ1:", "").strip()
+            elif line.startswith("РЕАКЦИЯ2:"):
+                reakciya2 = line.replace("РЕАКЦИЯ2:", "").strip()
 
         if not post_text:
             post_text = text
+
+        # Форматируем реакции с отступом
+        reactions = ""
+        if reakciya1 or reakciya2:
+            reactions = "\n\n" + reakciya1
+            if reakciya2:
+                reactions += "\n" + reakciya2
 
         return post_text, reactions
 
@@ -311,6 +338,11 @@ def send_to_telegram(text: str, image_url: str = None, reactions: str = "") -> b
 
 def main():
     print(f"🚀 Запуск бота | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # Проверка тихих часов
+    if is_quiet_hours():
+        print("🌙 Тихие часы (23:00–07:00 по Киеву). Пропускаем.")
+        return
 
     published = load_published()
     print(f"📚 В базе: {len(published)} записей")
