@@ -18,53 +18,41 @@ BOT_TOKEN  = os.environ["BOT_TOKEN"]
 CHAT_ID    = os.environ["CHAT_ID"]
 GROQ_KEY   = os.environ["GROQ_KEY"]
 
-PUBLISHED_FILE     = "published.json"
-MAX_POSTS_PER_RUN  = 1       # 1 новость за запуск
-FRESHNESS_HOURS    = 2       # не брать новости старше 2 часов
-DELAY_BETWEEN_POSTS = 4      # секунды между постами (на случай если MAX > 1)
+PUBLISHED_FILE      = "published.json"
+MAX_POSTS_PER_RUN   = 1      # 1 новость за запуск
+FRESHNESS_HOURS     = 2      # не брать новости старше 2 часов
+DELAY_BETWEEN_POSTS = 4      # секунды между постами
 
 # ══════════════════════════════════════════
 #  RSS ИСТОЧНИКИ
 # ══════════════════════════════════════════
 
 RSS_FEEDS = [
-    # 🌍 Мировые новости
+    # Мировые новости
     ("BBC World",           "https://feeds.bbci.co.uk/news/rss.xml"),
     ("Reuters",             "https://feeds.reuters.com/reuters/topNews"),
     ("Al Jazeera",          "https://www.aljazeera.com/xml/rss/all.xml"),
-    ("Associated Press",    "https://feeds.feedburner.com/APNewsAlerts"),
-
-    # 💻 Технологии и ИИ
+    # Технологии и ИИ
     ("TechCrunch",          "https://techcrunch.com/feed/"),
     ("The Verge",           "https://www.theverge.com/rss/index.xml"),
     ("Hacker News",         "https://hnrss.org/frontpage"),
     ("Wired",               "https://www.wired.com/feed/rss"),
     ("Ars Technica",        "https://feeds.arstechnica.com/arstechnica/index"),
     ("MIT Tech Review",     "https://www.technologyreview.com/feed/"),
-
-    # 💰 Бизнес и деньги
+    # Бизнес
     ("Bloomberg Markets",   "https://feeds.bloomberg.com/markets/news.rss"),
     ("Fortune",             "https://fortune.com/feed/"),
-    ("Business Insider",    "https://feeds.businessinsider.com/custom/all"),
-
-    # 🔬 Наука
+    # Наука
     ("Science Daily",       "https://www.sciencedaily.com/rss/all.xml"),
     ("NASA",                "https://www.nasa.gov/rss/dyn/breaking_news.rss"),
-    ("New Scientist",       "https://www.newscientist.com/feed/home/"),
-
-    # 😄 Курьёзы и интересное
+    # Курьёзы
     ("Reddit World News",   "https://www.reddit.com/r/worldnews/.rss"),
     ("Today I Learned",     "https://www.reddit.com/r/todayilearned/.rss"),
-    ("Reddit Interesting",  "https://www.reddit.com/r/InterestingAsHell/.rss"),
     ("Reddit Futurology",   "https://www.reddit.com/r/Futurology/.rss"),
-
-    # 🎮 Игры и развлечения
-    ("IGN",                 "https://feeds.ign.com/ign/all"),
-    ("Kotaku",              "https://kotaku.com/rss"),
 ]
 
 # ══════════════════════════════════════════
-#  ПРОМПТ ДЛЯ ИИ
+#  ПРОМПТЫ ДЛЯ ИИ
 # ══════════════════════════════════════════
 
 SYSTEM_PROMPT = """Ты — редактор Telegram-канала «Слышь, новость».
@@ -89,8 +77,7 @@ SYSTEM_PROMPT = """Ты — редактор Telegram-канала «Слышь,
 - 2-4 предложения
 - Начни с 1-2 эмодзи
 - Разговорный тон, без воды
-- Пиши на русском языке
-- Выбирай самую интересную и резонансную тему"""
+- Пиши на русском языке"""
 
 USER_PROMPT_TEMPLATE = """Перепиши новость в стиле канала:
 
@@ -98,7 +85,7 @@ USER_PROMPT_TEMPLATE = """Перепиши новость в стиле кана
 Краткое содержание: {summary}
 Источник: {source}
 
-Ответь в формате:
+Ответь строго в формате (две строки):
 ТЕКСТ: [текст поста 2-4 предложения с эмодзи]
 РЕАКЦИИ: [две реакции — выбери подходящие эмодзи сам в зависимости от темы новости]
 
@@ -123,17 +110,18 @@ def load_published() -> set:
             return set()
     return set()
 
+
 def save_published(ids: set):
-    # Держим только последние 1000 записей
     ids_list = list(ids)[-1000:]
     with open(PUBLISHED_FILE, "w") as f:
         json.dump(ids_list, f)
 
+
 def make_url_hash(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()
 
+
 def make_title_hash(title: str) -> str:
-    # Хэш первых 5 слов заголовка — защита от одной темы с разных источников
     normalized = ' '.join(sorted(title.lower().split()[:5]))
     return "t_" + hashlib.md5(normalized.encode()).hexdigest()
 
@@ -142,21 +130,15 @@ def make_title_hash(title: str) -> str:
 # ══════════════════════════════════════════
 
 def get_image_from_entry(entry) -> str:
-    # Способ 1: media:content
     media = entry.get("media_content", [])
     if media and media[0].get("url"):
         return media[0]["url"]
-
-    # Способ 2: enclosures
     for enc in entry.get("enclosures", []):
         if enc.get("type", "").startswith("image"):
             return enc.get("href", "")
-
-    # Способ 3: media:thumbnail
     thumbnail = entry.get("media_thumbnail", [])
     if thumbnail and thumbnail[0].get("url"):
         return thumbnail[0]["url"]
-
     return None
 
 # ══════════════════════════════════════════
@@ -170,7 +152,6 @@ def fetch_fresh_news(published_ids: set) -> list:
     for source_name, feed_url in RSS_FEEDS:
         try:
             feed = feedparser.parse(feed_url)
-
             for entry in feed.entries[:15]:
                 url = entry.get("link", "")
                 if not url:
@@ -180,13 +161,11 @@ def fetch_fresh_news(published_ids: set) -> list:
                 title      = entry.get("title", "").strip()
                 title_hash = make_title_hash(title)
 
-                # Пропускаем уже опубликованные (по URL и по заголовку)
                 if url_hash in published_ids:
                     continue
                 if title_hash in published_ids:
                     continue
 
-                # Проверяем свежесть
                 published_parsed = entry.get("published_parsed")
                 if published_parsed:
                     pub_dt = datetime(*published_parsed[:6], tzinfo=timezone.utc)
@@ -215,13 +194,13 @@ def fetch_fresh_news(published_ids: set) -> list:
 
     import random
     random.shuffle(results)
-    return results[:MAX_POSTS_PER_RUN * 5]  # берём с запасом для фильтрации
+    return results[:MAX_POSTS_PER_RUN * 5]
 
 # ══════════════════════════════════════════
 #  ИИ-РЕРАЙТ (Groq)
 # ══════════════════════════════════════════
 
-def rewrite_with_ai(title: str, summary: str, source: str) -> str:
+def rewrite_with_ai(title: str, summary: str, source: str):
     prompt = USER_PROMPT_TEMPLATE.format(
         title=title,
         summary=summary if summary else "Нет описания",
@@ -248,48 +227,50 @@ def rewrite_with_ai(title: str, summary: str, source: str) -> str:
 
         if response.status_code != 200:
             print(f"⚠️  Groq ошибка {response.status_code}: {response.text[:200]}")
-            return None
+            return None, None
 
         text = response.json()["choices"][0]["message"]["content"].strip()
 
-        # Если ИИ решил пропустить новость
         if text.upper().startswith("SKIP"):
             print("   ⏭️  ИИ пропустил (не интересно)")
-            return None
+            return None, None
+
+        post_text = ""
+        reactions = ""
 
         if "ТЕКСТ:" in text:
-            lines = text.split("\n")
-            post_text = ""
-            reactions = ""
-            for line in lines:
+            for line in text.split("\n"):
+                line = line.strip()
                 if line.startswith("ТЕКСТ:"):
                     post_text = line.replace("ТЕКСТ:", "").strip()
                 elif line.startswith("РЕАКЦИИ:"):
                     reactions = "\n\n" + line.replace("РЕАКЦИИ:", "").strip()
-            return post_text, reactions
-        return text, ""
+
+        if not post_text:
+            post_text = text
+
+        return post_text, reactions
 
     except Exception as e:
         print(f"⚠️  Ошибка ИИ: {e}")
-        return None
+        return None, None
 
 # ══════════════════════════════════════════
 #  ПУБЛИКАЦИЯ В TELEGRAM
 # ══════════════════════════════════════════
 
-def send_to_telegram(text: str, image_url: str = None, reactions_text: str = "") -> bool:
-    full_text = text + reactions_text + "\n\n👉 Слышь, новость. <a href='https://t.me/slysh_novost'>Подписаться</a>"
+def send_to_telegram(text: str, image_url: str = None, reactions: str = "") -> bool:
+    full_text = text + reactions + "\n\n👉 Слышь, новость. <a href='https://t.me/slysh_novost'>Подписаться</a>"
 
     try:
         if image_url:
             response = requests.post(
                 f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto",
                 json={
-                    "chat_id":      CHAT_ID,
-                    "photo":        image_url,
-                    "caption":      text,
-                    "parse_mode":   "HTML",
-                    "reply_markup": reply_markup,
+                    "chat_id":    CHAT_ID,
+                    "photo":      image_url,
+                    "caption":    full_text,
+                    "parse_mode": "HTML",
                 },
                 timeout=15
             )
@@ -298,10 +279,9 @@ def send_to_telegram(text: str, image_url: str = None, reactions_text: str = "")
                 f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
                 json={
                     "chat_id":                  CHAT_ID,
-                    "text":                     text,
+                    "text":                     full_text,
                     "parse_mode":               "HTML",
                     "disable_web_page_preview": True,
-                    "reply_markup":             reply_markup,
                 },
                 timeout=15
             )
@@ -311,7 +291,7 @@ def send_to_telegram(text: str, image_url: str = None, reactions_text: str = "")
         else:
             if image_url:
                 print("   ⚠️  Фото не загрузилось, публикую без фото")
-                return send_to_telegram(text, image_url=None)
+                return send_to_telegram(text, image_url=None, reactions=reactions)
             error = response.json().get("description", "Неизвестная ошибка")
             print(f"❌ Telegram ошибка: {error}")
             return False
@@ -345,26 +325,20 @@ def main():
 
         print(f"\n🔄 Обрабатываю: {item['title'][:60]}...")
 
-        result = rewrite_with_ai(item["title"], item["summary"], item["source"])
-        if not result:
-            continue
-        rewritten, reactions = result if isinstance(result, tuple) else (result, "")
-        if not rewritten:
+        post_text, reactions = rewrite_with_ai(item["title"], item["summary"], item["source"])
 
-        if not rewritten:
-            # Помечаем как просмотренное чтобы не возвращаться
+        if not post_text:
             published.add(item["url_hash"])
             published.add(item["title_hash"])
             continue
 
-        success = send_to_telegram(rewritten, item.get("image_url"), reactions)
+        success = send_to_telegram(post_text, item.get("image_url"), reactions or "")
 
         if success:
             published.add(item["url_hash"])
             published.add(item["title_hash"])
             published_count += 1
             print(f"   ✅ Опубликовано ({published_count}/{MAX_POSTS_PER_RUN})")
-
             if published_count < MAX_POSTS_PER_RUN:
                 time.sleep(DELAY_BETWEEN_POSTS)
         else:
@@ -372,6 +346,7 @@ def main():
 
     save_published(published)
     print(f"\n🏁 Готово. Опубликовано: {published_count} постов.")
+
 
 if __name__ == "__main__":
     main()
