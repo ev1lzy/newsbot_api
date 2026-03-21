@@ -1,0 +1,43 @@
+name: News Bot
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Download published IDs
+        uses: actions/download-artifact@v4
+        with:
+          name: published-ids
+          path: .
+        continue-on-error: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
+        run: python bot.py
+
+      - name: Save published IDs
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-ids
+          path: published.json
+          retention-days: 7
+        if: always()
