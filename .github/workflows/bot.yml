@@ -29,9 +29,9 @@ jobs:
 
       - name: Run bot
         env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        CHAT_ID: ${{ secrets.CHAT_ID }}
+        GROQ_KEY: ${{ secrets.GROQ_KEY }}
         run: python bot.py
 
       - name: Save published IDs
