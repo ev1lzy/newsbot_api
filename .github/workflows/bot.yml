@@ -1,5 +1,4 @@
 name: News Bot
-
 on:
   schedule:
     - cron: '*/10 * * * *'
@@ -7,7 +6,6 @@ on:
   push:
     branches:
       - main
-
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -21,6 +19,7 @@ jobs:
           name: published-ids
           path: .
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          merge-multiple: true
         continue-on-error: true
 
       - name: Setup Python
@@ -45,4 +44,5 @@ jobs:
           name: published-ids
           path: published.json
           retention-days: 90
+          overwrite: true
         if: always()
