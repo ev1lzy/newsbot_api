@@ -92,13 +92,23 @@ SYSTEM_PROMPT = """Ты — редактор Telegram-канала «Слышь,
 - Пиши на русском языке
 - Выбирай самую интересную и резонансную тему"""
 
-USER_PROMPT_TEMPLATE = """Перепиши эту новость в стиле канала:
+USER_PROMPT_TEMPLATE = """Перепиши новость в стиле канала:
 
 Заголовок: {title}
 Краткое содержание: {summary}
 Источник: {source}
 
-Ответь ТОЛЬКО готовым текстом поста или словом SKIP. Никаких пояснений."""
+Ответь в формате:
+ТЕКСТ: [текст поста 2-4 предложения с эмодзи]
+РЕАКЦИИ: [две реакции — выбери подходящие эмодзи сам в зависимости от темы новости]
+
+Примеры форматов реакций (эмодзи меняй под тему):
+😱 — не может быть / 🤷 — ну и ладно
+🔥 — топ новость / 💤 — скучно
+🤯 — сломал мозг / 😂 — ожидаемо
+❤️ — важно знать / 👎 — фейк
+
+Если новость не интересна — ответь: SKIP"""
 
 # ══════════════════════════════════════════
 #  РАБОТА С БАЗОЙ ОПУБЛИКОВАННЫХ
@@ -247,7 +257,17 @@ def rewrite_with_ai(title: str, summary: str, source: str) -> str:
             print("   ⏭️  ИИ пропустил (не интересно)")
             return None
 
-        return text
+        if "ТЕКСТ:" in text:
+            lines = text.split("\n")
+            post_text = ""
+            reactions = ""
+            for line in lines:
+                if line.startswith("ТЕКСТ:"):
+                    post_text = line.replace("ТЕКСТ:", "").strip()
+                elif line.startswith("РЕАКЦИИ:"):
+                    reactions = "\n\n" + line.replace("РЕАКЦИИ:", "").strip()
+            return post_text, reactions
+        return text, ""
 
     except Exception as e:
         print(f"⚠️  Ошибка ИИ: {e}")
@@ -257,13 +277,8 @@ def rewrite_with_ai(title: str, summary: str, source: str) -> str:
 #  ПУБЛИКАЦИЯ В TELEGRAM
 # ══════════════════════════════════════════
 
-def send_to_telegram(text: str, image_url: str = None) -> bool:
-    # Инлайн кнопка "Подписаться"
-    reply_markup = json.dumps({
-        "inline_keyboard": [[
-            {"text": "👉 Подписаться на канал", "url": "https://t.me/+vJDHO64MwXoxNjIy"}
-        ]]
-    })
+def send_to_telegram(text: str, image_url: str = None, reactions_text: str = "") -> bool:
+    full_text = text + reactions_text + "\n\n👉 Слышь, новость. <a href='https://t.me/slysh_novost'>Подписаться</a>"
 
     try:
         if image_url:
@@ -330,7 +345,11 @@ def main():
 
         print(f"\n🔄 Обрабатываю: {item['title'][:60]}...")
 
-        rewritten = rewrite_with_ai(item["title"], item["summary"], item["source"])
+        result = rewrite_with_ai(item["title"], item["summary"], item["source"])
+        if not result:
+            continue
+        rewritten, reactions = result if isinstance(result, tuple) else (result, "")
+        if not rewritten:
 
         if not rewritten:
             # Помечаем как просмотренное чтобы не возвращаться
@@ -338,7 +357,7 @@ def main():
             published.add(item["title_hash"])
             continue
 
-        success = send_to_telegram(rewritten, item.get("image_url"))
+        success = send_to_telegram(rewritten, item.get("image_url"), reactions)
 
         if success:
             published.add(item["url_hash"])
