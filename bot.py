@@ -85,15 +85,17 @@ USER_PROMPT_TEMPLATE = """Перепиши новость в стиле кана
 Краткое содержание: {summary}
 Источник: {source}
 
-Ответь строго в формате (две строки):
+Ответь строго в формате:
 ТЕКСТ: [текст поста 2-4 предложения с эмодзи]
-РЕАКЦИИ: [две реакции — выбери подходящие эмодзи сам в зависимости от темы новости]
+РЕАКЦИИ:
+[эмодзи] — [короткий текст реакции]
+[эмодзи] — [короткий текст реакции]
 
-Примеры форматов реакций (эмодзи меняй под тему):
-😱 — не может быть / 🤷 — ну и ладно
-🔥 — топ новость / 💤 — скучно
-🤯 — сломал мозг / 😂 — ожидаемо
-❤️ — важно знать / 👎 — фейк
+Пример как должны выглядеть реакции:
+❤️ — очень жаль, он крутой
+👎 — так ему и надо
+
+Эмодзи выбирай сам под тему новости. Текст реакций — короткий, живой, от лица читателя.
 
 Если новость не интересна — ответь: SKIP"""
 
@@ -237,6 +239,7 @@ def rewrite_with_ai(title: str, summary: str, source: str):
 
         post_text = ""
         reactions = ""
+        reactions_start = False
 
         if "ТЕКСТ:" in text:
             for line in text.split("\n"):
@@ -244,7 +247,9 @@ def rewrite_with_ai(title: str, summary: str, source: str):
                 if line.startswith("ТЕКСТ:"):
                     post_text = line.replace("ТЕКСТ:", "").strip()
                 elif line.startswith("РЕАКЦИИ:"):
-                    reactions = "\n\n" + line.replace("РЕАКЦИИ:", "").strip()
+                    reactions_start = True
+                elif reactions_start and line:
+                    reactions += "\n" + line
 
         if not post_text:
             post_text = text
@@ -260,7 +265,7 @@ def rewrite_with_ai(title: str, summary: str, source: str):
 # ══════════════════════════════════════════
 
 def send_to_telegram(text: str, image_url: str = None, reactions: str = "") -> bool:
-    full_text = text + reactions + "\n\n👉 Слышь, новость. <a href='https://t.me/slysh_novost'>Подписаться</a>"
+    full_text = text + reactions + "\n\n<a href='https://t.me/+vJDHO64MwXoxNjIy'>👉 Слышь, новость. Подписаться</a>"
 
     try:
         if image_url:
