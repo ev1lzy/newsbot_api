@@ -258,15 +258,23 @@ def rewrite_with_ai(title: str, summary: str, source: str) -> str:
 # ══════════════════════════════════════════
 
 def send_to_telegram(text: str, image_url: str = None) -> bool:
+    # Инлайн кнопка "Подписаться"
+    reply_markup = json.dumps({
+        "inline_keyboard": [[
+            {"text": "👉 Подписаться на канал", "url": "https://t.me/+vJDHO64MwXoxNjIy"}
+        ]]
+    })
+
     try:
         if image_url:
             response = requests.post(
                 f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto",
                 json={
-                    "chat_id":   CHAT_ID,
-                    "photo":     image_url,
-                    "caption":   text,
-                    "parse_mode": "HTML",
+                    "chat_id":      CHAT_ID,
+                    "photo":        image_url,
+                    "caption":      text,
+                    "parse_mode":   "HTML",
+                    "reply_markup": reply_markup,
                 },
                 timeout=15
             )
@@ -274,10 +282,11 @@ def send_to_telegram(text: str, image_url: str = None) -> bool:
             response = requests.post(
                 f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
                 json={
-                    "chat_id":               CHAT_ID,
-                    "text":                  text,
-                    "parse_mode":            "HTML",
+                    "chat_id":                  CHAT_ID,
+                    "text":                     text,
+                    "parse_mode":               "HTML",
                     "disable_web_page_preview": True,
+                    "reply_markup":             reply_markup,
                 },
                 timeout=15
             )
@@ -285,7 +294,6 @@ def send_to_telegram(text: str, image_url: str = None) -> bool:
         if response.status_code == 200:
             return True
         else:
-            # Если фото не загрузилось — пробуем без фото
             if image_url:
                 print("   ⚠️  Фото не загрузилось, публикую без фото")
                 return send_to_telegram(text, image_url=None)
