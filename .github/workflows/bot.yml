@@ -36,6 +36,7 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
           GROQ_KEY: ${{ secrets.GROQ_KEY }}
+          UNSPLASH_KEY: ${{ secrets.UNSPLASH_KEY }}
         run: python bot.py
 
       - name: Save published IDs
