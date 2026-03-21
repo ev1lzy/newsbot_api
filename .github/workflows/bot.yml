@@ -12,15 +12,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
-      - name: Download published IDs
-        uses: actions/download-artifact@v4
         with:
-          name: published-ids
-          path: .
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          merge-multiple: true
-        continue-on-error: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -38,11 +31,11 @@ jobs:
           UNSPLASH_KEY: ${{ secrets.UNSPLASH_KEY }}
         run: python bot.py
 
-      - name: Save published IDs
-        uses: actions/upload-artifact@v4
-        with:
-          name: published-ids
-          path: published.json
-          retention-days: 90
-          overwrite: true
+      - name: Save published IDs to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add published.json
+          git diff --staged --quiet || git commit -m "update published ids"
+          git push
         if: always()
