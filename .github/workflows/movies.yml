@@ -18,4 +18,5 @@ jobs:
           CHAT_ID: ${{ secrets.CHAT_ID }}
           GROQ_KEY: ${{ secrets.GROQ_KEY }}
           UNSPLASH_KEY: ${{ secrets.UNSPLASH_KEY }}
+          TMDB_KEY: ${{ secrets.TMDB_KEY }}
         run: python movies.py
