@@ -1,0 +1,21 @@
+name: Friday Movies
+on:
+  schedule:
+    - cron: '0 18 * * 5'
+  workflow_dispatch:
+jobs:
+  movies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install feedparser requests beautifulsoup4
+      - name: Run movies
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          GROQ_KEY: ${{ secrets.GROQ_KEY }}
+          UNSPLASH_KEY: ${{ secrets.UNSPLASH_KEY }}
+        run: python movies.py
