@@ -148,35 +148,24 @@ def make_movies_post(genre_ru: str, genre_emoji: str, movies: list) -> str:
 def send_message(text: str, movies: list):
     full_text = text + "\n\n<a href='https://t.me/+vJDHO64MwXoxNjIy'>👉 Слышь, новость. Подписаться</a>"
 
-    # Собираем постеры всех 5 фильмов
     posters = [m["poster"] for m in movies if m.get("poster")][:5]
 
     if len(posters) >= 2:
-        # Отправляем медиагруппу — все постеры сразу
+        # Текст добавляем к последнему фото
         media = [{"type": "photo", "media": url} for url in posters]
+        media[-1]["caption"] = full_text
+        media[-1]["parse_mode"] = "HTML"
+
         resp = requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMediaGroup",
             json={"chat_id": CHAT_ID, "media": media},
             timeout=15
         )
         if resp.status_code == 200:
-            print(f"✅ Отправлено {len(posters)} постеров")
+            print(f"✅ Отправлено {len(posters)} постеров с текстом")
         else:
-            print(f"⚠️  Медиагруппа не отправилась: {resp.text[:100]}")
-
-        # Текст отдельным сообщением после фото
-        requests.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            json={
-                "chat_id":                  CHAT_ID,
-                "text":                     full_text,
-                "parse_mode":               "HTML",
-                "disable_web_page_preview": True,
-            },
-            timeout=15
-        )
+            print(f"⚠️  Ошибка: {resp.text[:100]}")
     elif len(posters) == 1:
-        # Одно фото с текстом
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto",
             json={
@@ -188,7 +177,6 @@ def send_message(text: str, movies: list):
             timeout=15
         )
     else:
-        # Без фото
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
             json={
