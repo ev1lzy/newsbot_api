@@ -35,7 +35,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase
           git add published.json
           git diff --staged --quiet || git commit -m "update published ids"
           git push
+        if: always()
         if: always()
