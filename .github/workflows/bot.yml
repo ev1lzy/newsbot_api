@@ -42,4 +42,3 @@ jobs:
           git diff --staged --quiet || git commit -m "update published ids"
           git push
         if: always()
-        if: always()
