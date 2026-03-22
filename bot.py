@@ -277,7 +277,7 @@ def rewrite_with_ai(title: str, summary: str, source: str):
 
         text = response.json()["choices"][0]["message"]["content"].strip()
 
-        if text.upper().startswith("SKIP"):
+        if "SKIP" in text.upper()[:20]:
             print("   ⏭️  ИИ пропустил (не интересно)")
             return None, None, None
 
@@ -298,6 +298,8 @@ def rewrite_with_ai(title: str, summary: str, source: str):
                 reakciya2 = line.replace("РЕАКЦИЯ2:", "").strip()
 
         if not post_text:
+            if "SKIP" in text.upper()[:20]:
+                return None, None, None
             post_text = text
 
         reactions = ""
