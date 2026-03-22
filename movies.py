@@ -12,7 +12,7 @@ GROQ_KEY     = os.environ["GROQ_KEY"]
 TMDB_KEY     = os.environ["TMDB_KEY"]
 UNSPLASH_KEY = os.environ.get("UNSPLASH_KEY", "")
 
-# Жанры TMDB — ID жанров из их API
+# Жанры TMDB
 GENRES = [
     ("комедии",        35,   "😂"),
     ("триллеры",       53,   "😱"),
@@ -64,41 +64,40 @@ def get_current_genre():
 
 
 def fetch_tmdb_movies(genre_id: int) -> list:
-    """Получает топ фильмов с TMDB по жанру."""
     try:
         response = requests.get(
             "https://api.themoviedb.org/3/discover/movie",
             params={
-                "api_key":              TMDB_KEY,
-                "with_genres":          genre_id,
-                "sort_by":              "vote_average.desc",
-                "vote_count.gte":       5000,
-                "language":             "ru-RU",
-                "include_adult":        False,
-                "page":                 1,
+                "api_key":        TMDB_KEY,
+                "with_genres":    genre_id,
+                "sort_by":        "vote_average.desc",
+                "vote_count.gte": 5000,
+                "language":       "ru-RU",
+                "include_adult":  False,
+                "page":           1,
             },
             timeout=15
         )
 
         if response.status_code != 200:
-            print(f"⚠️  TMDB ответил {response.status_code}: {response.text[:200]}")
+            print(f"⚠️  TMDB ответил {response.status_code}")
             return []
 
         results = response.json().get("results", [])
         movies = []
 
         for movie in results[:8]:
-            title   = movie.get("title", "")
-            year    = movie.get("release_date", "")[:4]
-            rating  = round(movie.get("vote_average", 0), 1)
-            poster  = movie.get("poster_path", "")
+            title  = movie.get("title", "")
+            year   = movie.get("release_date", "")[:4]
+            rating = round(movie.get("vote_average", 0), 1)
+            poster = movie.get("poster_path", "")
 
             if title and rating > 0:
                 movies.append({
                     "title":  title,
                     "year":   year,
                     "rating": rating,
-                    "poster": f"https://image.tmdb.org/t/p/w780{poster}" if poster else None
+                    "poster": f"https://image.tmdb.org/t/p/w500{poster}" if poster else None
                 })
 
         return movies[:5]
@@ -146,41 +145,50 @@ def make_movies_post(genre_ru: str, genre_emoji: str, movies: list) -> str:
     return None
 
 
-def get_unsplash_photo(query: str) -> str:
-    if not UNSPLASH_KEY:
-        return None
-    try:
-        response = requests.get(
-            "https://api.unsplash.com/photos/random",
-            params={"query": query, "orientation": "landscape"},
-            headers={"Authorization": f"Client-ID {UNSPLASH_KEY}"},
-            timeout=10
-        )
-        if response.status_code == 200:
-            return response.json()["urls"]["regular"]
-    except Exception as e:
-        print(f"⚠️  Unsplash ошибка: {e}")
-    return None
-
-
-def send_message(text: str, image_url: str = None):
+def send_message(text: str, movies: list):
     full_text = text + "\n\n<a href='https://t.me/+vJDHO64MwXoxNjIy'>👉 Слышь, новость. Подписаться</a>"
 
-    if image_url:
+    # Собираем постеры всех 5 фильмов
+    posters = [m["poster"] for m in movies if m.get("poster")][:5]
+
+    if len(posters) >= 2:
+        # Отправляем медиагруппу — все постеры сразу
+        media = [{"type": "photo", "media": url} for url in posters]
         resp = requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMediaGroup",
+            json={"chat_id": CHAT_ID, "media": media},
+            timeout=15
+        )
+        if resp.status_code == 200:
+            print(f"✅ Отправлено {len(posters)} постеров")
+        else:
+            print(f"⚠️  Медиагруппа не отправилась: {resp.text[:100]}")
+
+        # Текст отдельным сообщением после фото
+        requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            json={
+                "chat_id":                  CHAT_ID,
+                "text":                     full_text,
+                "parse_mode":               "HTML",
+                "disable_web_page_preview": True,
+            },
+            timeout=15
+        )
+    elif len(posters) == 1:
+        # Одно фото с текстом
+        requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto",
             json={
                 "chat_id":    CHAT_ID,
-                "photo":      image_url,
+                "photo":      posters[0],
                 "caption":    full_text,
                 "parse_mode": "HTML",
             },
             timeout=15
         )
-        if resp.status_code != 200:
-            print(f"⚠️  Фото не загрузилось, публикую без фото")
-            send_message(text, image_url=None)
     else:
+        # Без фото
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
             json={
@@ -214,16 +222,7 @@ def main():
         print("❌ ИИ не ответил")
         return
 
-    # Фото: постер первого фильма или Unsplash
-    image_url = movies[0].get("poster") if movies else None
-    if not image_url:
-        image_url = get_unsplash_photo(f"{genre_ru} cinema movie")
-        if image_url:
-            print("✅ Фото с Unsplash")
-    else:
-        print("✅ Постер фильма с TMDB")
-
-    send_message(post, image_url)
+    send_message(post, movies)
     print(f"✅ Пятничный топ опубликован! Жанр: {genre_ru}")
 
 
